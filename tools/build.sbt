@@ -9,3 +9,6 @@ libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
 libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0"
 libraryDependencies += "com.jsuereth" %% "scala-arm" % "2.0"
 libraryDependencies += "com.github.melrief" %% "purecsv" % "0.1.1"
+
+test in assembly := {}
+assemblyJarName in assembly := "tools.jar"

@@ -15,6 +15,7 @@ object MacroDefAnalysis extends App with LazyLogging {
 
   case class OutputRecord(relativePath: String, nDefMacros: Int, error: String)
 
+  println(args.toList)
   if (args.length != 1) {
     sys.error(s"Usage: MacroDefAnalysis <path/to/project>")
   }
