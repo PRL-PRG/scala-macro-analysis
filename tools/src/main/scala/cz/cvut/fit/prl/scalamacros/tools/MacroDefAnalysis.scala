@@ -6,48 +6,50 @@ import com.typesafe.scalalogging.LazyLogging
 import purecsv.safe._
 import resource._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
 import scala.meta._
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 
 object MacroDefAnalysis extends App with LazyLogging {
-
   val NL = sys.props("line.separator")
-  val ProjectPath = "/var/lib/scala/projects"
-  val Input = "/var/lib/scala/analysis/files.csv"
-  val Output = "/var/lib/scala/analysis/def-macros.csv"
 
-  case class InputRecord(fileId: Int, projectId: Int, relativeUrl: String, fileHash: String)
-  case class OutputRecord(projectId: Int, relativePath: String, nDefMacros: Int)
+  case class OutputRecord(relativePath: String, nDefMacros: Int, error: String)
 
-  def analyze(rec: InputRecord): Try[OutputRecord] = Try {
-    val path = s"$ProjectPath/${rec.projectId}/${rec.relativeUrl}"
-    val source = new File(path).parse[Source].get
-    val defs = source.collect { case x : Defn.Macro => x}
+  if (args.length != 1) {
+    sys.error(s"Usage: MacroDefAnalysis <path/to/project>")
+  }
+
+  val projectPath = args(0)
+  val input = s"$projectPath/_analysis_/unique-files.txt"
+  val output = s"$projectPath/_analysis_/def-macros-output.csv"
+
+  if (!new File(input).canRead) {
+    println(s"$input: does not exists or is not readable - skipping")
+    sys.exit(0)
+  }
+
+  def analyze(path: String): Try[Int] = Try {
+    val source = new File(s"$projectPath/$path").parse[Source].get
+    val defs = source.collect { case x: Defn.Macro => x }
     val n = defs.size
 
     logger.info(s"Processed $path: $n")
 
-    OutputRecord(rec.projectId, rec.relativeUrl, n)
+    n
   }
 
-  val uniqueFiles =
+  val csv =
     scala.io.Source
-      .fromFile(Input)
+      .fromFile(input)
       .getLines()
-      .drop(1)
-      .map(x => CSVReader[InputRecord].readCSVFromString(x).head)
+      .map { x =>
+        analyze(x) match {
+          case Success(n) => OutputRecord(x, n, "")
+          case Failure(e) => OutputRecord(x, -1, e.getMessage)
+        }
+      }
+      .map(_.toCSV())
+      .mkString("", NL, NL)
 
-  val process = Future.traverse(uniqueFiles)(x => Future(x.flatMap(analyze)))
-  val result = Await.result(process, Duration.Inf)
-
-  for {
-    out <- managed(new FileWriter(Output))
-    res <- result.collect { case Success(x) => x } if res.nDefMacros > 0
-  } {
-    out.write(res.toCSV() + NL)
-  }
+  managed(new FileWriter(output)).foreach(_.write(csv))
 }
