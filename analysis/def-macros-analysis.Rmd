@@ -1,0 +1,48 @@
+---
+title: "def macros"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+df <- read_csv("def-macros-merged.csv")
+df_clean <- df[!is.na(df$n), ]
+```
+
+```{r}
+results <- tribble(
+  ~comment, ~value,
+  "Num of projects considered", nrow(df),
+  "Num of projects analyzed", nrow(df_clean),
+  "All def macros", sum(df_clean$n),
+  "Num of projects defining at last one def macro", sum(df_clean$n > 0)
+)
+```
+
+```{r}
+knitr::kable(results)
+```
+
+
+```{r}
+df_clean %>%
+  filter(n > 0) %>%
+  ggplot(aes(x=n)) + 
+    geom_histogram(bins=20) + 
+    scale_x_log10() +
+    labs(x="Number of projects", y="Number of macros", title="Distibution of number of macros in projects defining at least one")
+```
+
+```{r}
+top_n(df_clean, 50, wt = n) %>% 
+  arrange(desc(n)) %>% 
+  select(project, n, url) %>%
+  knitr::kable()
+```
+
